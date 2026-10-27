@@ -16,7 +16,7 @@
 
     <!-- Directory where the downloads will be exported to.
          The path is relative to the root of the external storage.-->
-    <string name="export_path" translatable="false">LineageOS updates/</string>
+    <string name="export_path" translatable="false">uwuAOSP updates/</string>
 
     <!--
         Optional placeholders replaced at runtime:
@@ -24,7 +24,7 @@
           {type} - Build type
           {incr} - Incremental version
     -->
-    <string name="updater_server_url" translatable="false">https://download.lineageos.org/api/v2/devices/{device}/builds</string>
+    <string name="updater_server_url" translatable="false"></string>
 
     <string name="verification_failed_notification">Verification failed</string>
     <string name="verifying_download_notification">Verifying update</string>
@@ -91,7 +91,7 @@
     <string name="menu_stream_updates_summary">Install updates while downloading. Disable to save update packages for export.</string>
     <string name="menu_delete_update">Delete</string>
     <string name="menu_export_update">Export update</string>
-    <string name="menu_changelog_url" translatable="false">https://download.lineageos.org/<xliff:g id="device_name">%1$s</xliff:g>/changes</string>
+    <string name="menu_changelog_url" translatable="false">https://uwuaosp.uwuniverse.org/blog/uwu-%1$s/</string>
     <string name="menu_view_downloads">View on <xliff:g id="brand_name" example="LineageOS">%1$s</xliff:g> Downloads</string>
     <string name="menu_metered_network_warning">Metered network warning</string>
     <string name="menu_metered_network_warning_summary">Warn before downloading over mobile data</string>
@@ -112,15 +112,15 @@
     <string name="header_android_version">Android <xliff:g id="version" example="16">%1$s</xliff:g></string>
 
     <!-- Banner -->
-    <string name="brand_name" translatable="false">LineageOS</string>
+    <string name="brand_name" translatable="false">uwuAOSP</string>
     <string name="header_build_version" translatable="false">LineageOS <xliff:g id="version" example="23.2">%1$s</xliff:g></string>
     <string name="build_date">Build date</string>
     <string name="security_update">Security update</string>
     <string name="show_changelog">Recent changes</string>
     <string name="report_issues">Report issues</string>
-    <string name="report_issue_url" translatable="false">https://wiki.lineageos.org/how-to/bugreport/</string>
+    <string name="report_issue_url" translatable="false">https://github.com/uwuAOSP/issue_tracker/issues</string>
     <string name="header_review_updates">Review updates and recent changes on</string>
-    <string name="header_download_url" translatable="false">download.lineageos.org</string>
+    <string name="header_download_url" translatable="false">uwuaosp.uwuniverse.org</string>
     <string name="found_bug">Found a bug? Report it with our bug report guide:</string>
 
     <string name="updates_zero_state_title">No updates available</string>
@@ -174,7 +174,7 @@
 
     <string name="blocked_update_dialog_title">Update blocked</string>
     <string name="blocked_update_dialog_message">This update cannot be installed using the updater app.  Please read <xliff:g id="info_url">%1$s</xliff:g> for more information.</string>
-    <string name="blocked_update_info_url" translatable="false">https://wiki.lineageos.org/devices/<xliff:g id="device_name">%1$s</xliff:g>/upgrade/</string>
+    <string name="blocked_update_info_url" translatable="false">https://uwuaosp.uwuniverse.org/</string>
 
     <string name="blocked_update_dialog_title_downgrade">Downgrade blocked</string>
     <string name="blocked_update_dialog_message_downgrade">This update is older than the current system and cannot be installed.</string>

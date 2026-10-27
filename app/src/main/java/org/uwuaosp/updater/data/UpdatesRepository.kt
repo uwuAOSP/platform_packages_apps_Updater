@@ -9,6 +9,8 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerializationException
 import org.uwuaosp.updater.data.source.local.UpdatesLocalDataSource
 import org.uwuaosp.updater.data.source.network.UpdatesNetworkDataSource
@@ -20,12 +22,16 @@ import java.io.IOException
 
 private const val TAG = "UpdatesRepository"
 
+data class UpdateCheckResult(val checkedAt: Long, val updates: List<Update>)
+
 class UpdatesRepository(
     private val networkMonitor: NetworkMonitor,
     private val notificationHelper: NotificationHelper,
     private val networkDataSource: UpdatesNetworkDataSource,
     private val localDataSource: UpdatesLocalDataSource,
 ) {
+    private val checkMutex = Mutex()
+
     fun observeLocalUpdates(): Flow<List<Update>> = localDataSource.observeUpdates()
 
     /**
@@ -33,12 +39,17 @@ class UpdatesRepository(
      * notification if new updates are found. Callers observe [observeLocalUpdates] for results —
      * Room only emits when the stored data actually changes.
      *
-     * @return the timestamp of the fetch, or null if skipped due to no network.
+     * @return 检查时间和同步后的更新列表，离线时返回null
      * @throws IOException on network or HTTP errors.
      * @throws SerializationException if the response cannot be parsed.
      */
-    suspend fun fetchUpdates(): Long? {
-        if (!networkMonitor.currentNetworkState.isOnline) return null
+    suspend fun fetchUpdates(): UpdateCheckResult? = checkMutex.withLock {
+        if (!networkMonitor.currentNetworkState.isOnline) return@withLock null
+
+        // 先完整校验远端响应，失败或未配置时不能清理已有下载
+        val networkUpdates = withContext(Dispatchers.IO) {
+            networkDataSource.fetchUpdates().map { it.toUpdate() }.filter { filterUpdates(it) }
+        }
 
         val localUpdates = withContext(Dispatchers.IO) {
             localDataSource.getUpdates()
@@ -52,12 +63,6 @@ class UpdatesRepository(
                 localDataSource.removeUpdate(it.downloadId)
             }
         }
-
-        val networkUpdates = withContext(Dispatchers.IO) {
-            networkDataSource.fetchUpdates().map { it.toUpdate() }.filter { filterUpdates(it) }
-        }
-
-        if (networkUpdates.isEmpty()) return System.currentTimeMillis()
 
         val networkIds = networkUpdates.map { it.downloadId }.toSet()
 
@@ -80,7 +85,8 @@ class UpdatesRepository(
 
             // Delete temp files and DB entries for updates no longer advertised by the server.
             localUpdates.values.filter {
-                it.downloadId !in networkIds && it.downloadId != Update.LOCAL_ID &&
+                it.status.persistentStatus == 0 &&
+                        it.downloadId !in networkIds && it.downloadId != Update.LOCAL_ID &&
                         it.downloadUrl != null
             }.forEach {
                 it.file?.delete()
@@ -88,7 +94,7 @@ class UpdatesRepository(
             }
         }
 
-        return System.currentTimeMillis()
+        UpdateCheckResult(System.currentTimeMillis(), withContext(Dispatchers.IO) { localDataSource.getUpdates() })
     }
 
     private fun filterUpdates(update: Update): Boolean {

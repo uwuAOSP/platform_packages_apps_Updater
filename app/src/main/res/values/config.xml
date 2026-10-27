@@ -4,6 +4,7 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <color name="uwu_icon_background">#8F8EE8</color>
     <!-- Base background of the header card. -->
     <color name="brand_primary">#167C80</color>
 
@@ -17,5 +18,5 @@
     <color name="brand_sheen">#EADDFF</color>
 
     <!-- URL template for opening the device-specific downloads page from the update menu. -->
-    <string name="menu_downloads_url" translatable="false">https://download.lineageos.org/devices/<xliff:g id="device_name">%1$s</xliff:g>/builds</string>
+    <string name="menu_downloads_url" translatable="false">https://uwuaosp.uwuniverse.org/</string>
 </resources>

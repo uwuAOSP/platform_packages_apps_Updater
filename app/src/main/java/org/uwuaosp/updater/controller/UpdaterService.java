@@ -196,7 +196,8 @@ public class UpdaterService extends Service {
             boolean canStreamUpdate = InstallUtils.canStreamUpdate(update,
                     mUserPreferencesRepository.getStreamUpdatesBlocking());
             if (!canStreamUpdate && !update.getStatus().hasVerifiedPackage()) {
-                throw new IllegalArgumentException(update.getDownloadId() + " is not verified");
+                Log.e(TAG, "Refusing installation of an unverified package");
+                return START_NOT_STICKY;
             }
             try {
                 if (canStreamUpdate || new OtaMetadataParser(update.getFile()).isABUpdate()) {

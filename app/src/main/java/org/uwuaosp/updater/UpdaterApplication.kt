@@ -11,6 +11,7 @@ import com.android.settingslib.spa.framework.common.SpaEnvironment
 import com.android.settingslib.spa.framework.common.SpaEnvironmentFactory
 import kotlinx.coroutines.MainScope
 import org.uwuaosp.updater.data.AppStateRepository
+import org.uwuaosp.updater.data.ChangelogRepository
 import org.uwuaosp.updater.data.UpdatesRepository
 import org.uwuaosp.updater.data.UserPreferencesRepository
 import org.uwuaosp.updater.data.source.local.UpdatesDatabase
@@ -32,6 +33,7 @@ class UpdaterApplication : Application() {
     }
     val networkMonitor by lazy { NetworkMonitor(applicationContext, coroutineScope) }
     val notificationHelper by lazy { NotificationHelper(applicationContext) }
+    val changelogRepository by lazy { ChangelogRepository() }
     val appStateRepository by lazy { AppStateRepository(applicationContext) }
     val userPreferencesRepository by lazy { UserPreferencesRepository(applicationContext) }
     val updatesRepository by lazy {

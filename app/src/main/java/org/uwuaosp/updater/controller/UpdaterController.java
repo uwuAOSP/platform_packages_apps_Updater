@@ -19,6 +19,7 @@ import org.uwuaosp.updater.data.source.local.UpdatesLocalDataSource;
 import org.uwuaosp.updater.data.source.local.UpdatesDatabase;
 import org.uwuaosp.updater.download.DownloadClient;
 import org.uwuaosp.updater.misc.Utils;
+import org.uwuaosp.updater.util.OtaMetadataParser;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,7 +52,7 @@ public class UpdaterController {
     private final File mDownloadRoot;
 
     private int mActiveDownloads = 0;
-    private final Set<String> mVerifyingUpdates = new HashSet<>();
+    private final Set<String> mVerifyingUpdates = ConcurrentHashMap.newKeySet();
 
     public static synchronized UpdaterController getInstance(Context context) {
         if (sUpdaterController == null) {
@@ -123,7 +124,7 @@ public class UpdaterController {
     }
 
     private void tryReleaseWakelock() {
-        if (!hasActiveDownloads()) {
+        if (!hasActiveDownloads() && mWakeLock.isHeld()) {
             mWakeLock.release();
         }
     }
@@ -236,7 +237,7 @@ public class UpdaterController {
                 }
                 final long now = SystemClock.elapsedRealtime();
                 int progress = Math.round(bytesRead * 100f / contentLength);
-                if (progress != mProgress || mLastUpdate - now > MAX_REPORT_INTERVAL_MS) {
+                if (progress != mProgress || now - mLastUpdate > MAX_REPORT_INTERVAL_MS) {
                     mProgress = progress;
                     mLastUpdate = now;
                     synchronized (entry) {
@@ -254,29 +255,32 @@ public class UpdaterController {
 
     @SuppressLint("SetWorldReadable")
     private void verifyUpdateAsync(final String downloadId) {
-        mVerifyingUpdates.add(downloadId);
+        if (!mVerifyingUpdates.add(downloadId)) return;
         new Thread(() -> {
             DownloadEntry entry = mDownloads.get(downloadId);
-            if (entry != null) {
-                Update update = entry.mUpdate;
-                File file = update.getFile();
-                if (file.exists() && verifyPackage(file)) {
-                    file.setReadable(true, false);
-                    synchronized (entry) {
-                        entry.mUpdate = entry.mUpdate.withStatus(UpdateStatus.VERIFIED);
-                    }
-                    mUpdatesLocalDataSource.changeStatus(downloadId, UpdateStatus.VERIFIED);
-                } else {
-                    mUpdatesLocalDataSource.removeUpdate(downloadId);
-                    synchronized (entry) {
-                        entry.mUpdate = entry.mUpdate.toBuilder()
-                                .setProgress(0)
-                                .setStatus(UpdateStatus.VERIFICATION_FAILED)
-                                .build();
+            try {
+                if (entry != null) {
+                    Update update = entry.mUpdate;
+                    File file = update.getFile();
+                    if (file != null && file.exists() && verifyPackage(file)) {
+                        file.setReadable(true, false);
+                        synchronized (entry) {
+                            entry.mUpdate = entry.mUpdate.withStatus(UpdateStatus.VERIFIED);
+                        }
+                        mUpdatesLocalDataSource.changeStatus(downloadId, UpdateStatus.VERIFIED);
+                    } else {
+                        mUpdatesLocalDataSource.removeUpdate(downloadId);
+                        synchronized (entry) {
+                            entry.mUpdate = entry.mUpdate.toBuilder()
+                                    .setProgress(0)
+                                    .setStatus(UpdateStatus.VERIFICATION_FAILED)
+                                    .build();
+                        }
                     }
                 }
+            } finally {
                 mVerifyingUpdates.remove(downloadId);
-                notifyUpdateChange(downloadId);
+                if (entry != null) notifyUpdateChange(downloadId);
             }
         }).start();
     }
@@ -284,7 +288,8 @@ public class UpdaterController {
     private boolean verifyPackage(File file) {
         try {
             android.os.RecoverySystem.verifyPackage(file, null, null);
-            Log.e(TAG, "Verification successful");
+            new OtaMetadataParser(file);
+            Log.i(TAG, "Verification successful");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Verification failed", e);
@@ -321,9 +326,17 @@ public class UpdaterController {
     }
 
     public void addLocalUpdate(Update update) {
+        if (isInstallingUpdate(Update.LOCAL_ID)) {
+            throw new IllegalStateException("Cannot replace the package being installed");
+        }
         Update localUpdate = update.withAvailableOnline(false);
-        mDownloads.put(localUpdate.getDownloadId(), new DownloadEntry(localUpdate));
         mUpdatesLocalDataSource.addUpdate(localUpdate);
+        DownloadEntry previous = mDownloads.put(localUpdate.getDownloadId(), new DownloadEntry(localUpdate));
+        if (previous != null && previous.mUpdate.getFile() != null &&
+                !previous.mUpdate.getFile().equals(localUpdate.getFile())) {
+            previous.mUpdate.getFile().delete();
+        }
+        notifyUpdateChange(localUpdate.getDownloadId());
     }
 
     public boolean addUpdate(final Update updateInfo, boolean availableOnline) {

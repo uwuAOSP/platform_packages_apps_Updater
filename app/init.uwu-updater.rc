@@ -1,0 +1,3 @@
+on post-fs-data
+    mkdir /data/uwuaosp_updates 0770 system cache encryption=Require
+    restorecon_recursive /data/uwuaosp_updates

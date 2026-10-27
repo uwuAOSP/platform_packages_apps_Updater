@@ -22,12 +22,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 
 public class UpdateImporter {
     private static final int REQUEST_PICK = 9061;
     private static final String TAG = "UpdateImporter";
     private static final String MIME_ZIP = "application/zip";
-    private static final String FILE_NAME = "localUpdate.zip";
 
     private final Activity activity;
     private final Callbacks callbacks;
@@ -39,10 +39,9 @@ public class UpdateImporter {
         this.callbacks = callbacks;
     }
 
-    public void stopImport() {
+    public synchronized void stopImport() {
         if (workingThread != null && workingThread.isAlive()) {
             workingThread.interrupt();
-            workingThread = null;
         }
     }
 
@@ -58,11 +57,13 @@ public class UpdateImporter {
             return false;
         }
 
+        if (data == null || data.getData() == null) return false;
         return onPicked(data.getData());
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    private boolean onPicked(Uri uri) {
+    private synchronized boolean onPicked(Uri uri) {
+        if (workingThread != null && workingThread.isAlive()) return true;
         callbacks.onImportStarted();
 
         workingThread = new Thread(() -> {
@@ -70,10 +71,12 @@ public class UpdateImporter {
             try {
                 importedFile = importFile(uri);
                 verifyPackage(importedFile);
-
                 final Update update = buildLocalUpdate(importedFile);
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException();
                 addUpdate(update);
-                activity.runOnUiThread(() -> callbacks.onImportCompleted(update));
+                activity.runOnUiThread(() -> {
+                    if (!activity.isDestroyed()) callbacks.onImportCompleted(update);
+                });
             } catch (Exception e) {
                 Log.e(TAG, "Failed to import update package", e);
                 // Do not store invalid update
@@ -81,7 +84,9 @@ public class UpdateImporter {
                     importedFile.delete();
                 }
 
-                activity.runOnUiThread(() -> callbacks.onImportCompleted(null));
+                activity.runOnUiThread(() -> {
+                    if (!activity.isDestroyed()) callbacks.onImportCompleted(null);
+                });
             }
         });
         workingThread.start();
@@ -91,30 +96,25 @@ public class UpdateImporter {
     @SuppressLint("SetWorldReadable")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private File importFile(Uri uri) throws IOException {
-        final ParcelFileDescriptor parcelDescriptor = activity.getContentResolver()
-                .openFileDescriptor(uri, "r");
-        if (parcelDescriptor == null) {
-            throw new IOException("Failed to obtain fileDescriptor");
-        }
-
-        final FileInputStream iStream = new FileInputStream(parcelDescriptor
-                .getFileDescriptor());
         final File downloadDir = Utils.getDownloadPath(activity);
-        final File outFile = new File(downloadDir, FILE_NAME);
-        if (outFile.exists()) {
+        // 每次导入拥有独立文件，失败不能删除上一次已验证的本地包
+        final File outFile = File.createTempFile("local-", ".zip", downloadDir);
+        try (ParcelFileDescriptor descriptor = activity.getContentResolver().openFileDescriptor(uri, "r")) {
+            if (descriptor == null) throw new IOException("Failed to obtain fileDescriptor");
+            try (FileInputStream input = new FileInputStream(descriptor.getFileDescriptor());
+                    FileOutputStream output = new FileOutputStream(outFile)) {
+                int read;
+                final byte[] buffer = new byte[64 * 1024];
+                while ((read = input.read(buffer)) != -1) {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException();
+                    output.write(buffer, 0, read);
+                }
+                output.getFD().sync();
+            }
+        } catch (IOException | RuntimeException e) {
             outFile.delete();
+            throw e;
         }
-        final FileOutputStream oStream = new FileOutputStream(outFile);
-
-        int read;
-        final byte[] buffer = new byte[4096];
-        while ((read = iStream.read(buffer)) > 0) {
-            oStream.write(buffer, 0, read);
-        }
-        oStream.flush();
-        oStream.close();
-        iStream.close();
-        parcelDescriptor.close();
 
         outFile.setReadable(true, false);
 
@@ -132,7 +132,7 @@ public class UpdateImporter {
             .setOsPatchLevel(metadata.getSecurityPatchLevel())
             .setOsSdkLevel(metadata.getSdkLevel())
             .setStatus(UpdateStatus.VERIFIED)
-            .setVersion(name)
+            .setVersion(metadata.getVersion().isEmpty() ? name : metadata.getVersion())
             .build();
     }
 

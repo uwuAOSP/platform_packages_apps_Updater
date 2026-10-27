@@ -23,6 +23,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.uwuaosp.updater.UpdaterApplication
 import org.uwuaosp.updater.data.CheckInterval
+import org.uwuaosp.updater.data.source.network.UpdatesNetworkDataSource
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
 
@@ -31,13 +33,16 @@ class UpdatesCheckWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (!UpdatesNetworkDataSource.isConfigured(applicationContext)) return Result.success()
         return try {
             val application = applicationContext as UpdaterApplication
-            val fetchedAt = application.updatesRepository.fetchUpdates()
-            if (fetchedAt != null) {
-                application.appStateRepository.setLastCheckedTimestamp(fetchedAt)
+            val result = application.updatesRepository.fetchUpdates()
+            if (result != null) {
+                application.appStateRepository.setLastCheckedTimestamp(result.checkedAt)
             }
             Result.success()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Update check failed", e)
             Result.retry()
@@ -61,6 +66,10 @@ class UpdatesCheckWorker(
 
         @JvmStatic
         fun scheduleOneshotCheck(context: Context) {
+            if (!UpdatesNetworkDataSource.isConfigured(context)) {
+                WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME_ONESHOT)
+                return
+            }
             WorkManager.getInstance(context).enqueueUniqueWork(
                 WORK_NAME_ONESHOT,
                 ExistingWorkPolicy.KEEP,
@@ -72,6 +81,10 @@ class UpdatesCheckWorker(
 
         @JvmStatic
         fun schedulePeriodicCheck(context: Context) {
+            if (!UpdatesNetworkDataSource.isConfigured(context)) {
+                cancelPeriodicCheck(context)
+                return
+            }
             CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
                 val prefs =
                     (context.applicationContext as UpdaterApplication).userPreferencesRepository
@@ -87,6 +100,10 @@ class UpdatesCheckWorker(
 
         @JvmStatic
         fun reschedulePeriodicCheck(context: Context) {
+            if (!UpdatesNetworkDataSource.isConfigured(context)) {
+                cancelPeriodicCheck(context)
+                return
+            }
             CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
                 val prefs =
                     (context.applicationContext as UpdaterApplication).userPreferencesRepository

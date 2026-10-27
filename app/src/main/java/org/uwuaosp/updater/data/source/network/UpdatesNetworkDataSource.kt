@@ -16,12 +16,13 @@ import java.util.concurrent.TimeUnit
 class UpdatesNetworkDataSource(private val context: Context) {
     private val serverUrl: String
         get() {
-            val base = DeviceInfoUtils.updaterUri.trim().ifEmpty {
-                context.getString(R.string.updater_server_url)
-            }
+            val base = context.getString(R.string.updater_server_url).trim()
+            check(base.isNotEmpty()) { "Update source is not configured" }
             require(base.startsWith("https://")) {
                 "Update server URL must use HTTPS: $base"
             }
+            require(DeviceInfoUtils.device.isNotBlank()) { "Missing ro.uwu.device" }
+            require(DeviceInfoUtils.releaseType.isNotBlank()) { "Missing ro.uwu.releasetype" }
             return base
                 .replace("{device}", DeviceInfoUtils.device)
                 .replace("{type}", DeviceInfoUtils.releaseType.lowercase())
@@ -43,9 +44,26 @@ class UpdatesNetworkDataSource(private val context: Context) {
                 throw IOException("Unexpected HTTP status: ${response.code}")
             }
 
-            response.body?.string() ?: throw IOException("Empty response body")
+            val body = response.body ?: throw IOException("Empty response body")
+            val source = body.source()
+            if (source.request(MAX_RESPONSE_BYTES + 1)) {
+                throw IOException("Update response exceeds $MAX_RESPONSE_BYTES bytes")
+            }
+            source.buffer.readUtf8()
         }
 
-        return Json.decodeFromString<List<NetworkUpdate>>(responseBody)
+        val updates = Json.decodeFromString<List<NetworkUpdate>>(responseBody).onEach { it.validate() }
+        require(updates.map { it.files.single().sha256.lowercase() }.distinct().size == updates.size) {
+            "Duplicate OTA artifact identity"
+        }
+        return updates
+    }
+
+    companion object {
+        private const val MAX_RESPONSE_BYTES = 1024L * 1024L
+
+        @JvmStatic
+        fun isConfigured(context: Context): Boolean =
+            context.getString(R.string.updater_server_url).isNotBlank()
     }
 }
