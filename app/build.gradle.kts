@@ -27,7 +27,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "org.lineageos.updater"
+        applicationId = "org.uwuaosp.updater"
         minSdk = 34
         targetSdk = 34
         versionCode = 1
@@ -82,7 +82,7 @@ android {
             }
         }
     }
-    namespace = "org.lineageos.updater"
+    namespace = "org.uwuaosp.updater"
 }
 
 room {
