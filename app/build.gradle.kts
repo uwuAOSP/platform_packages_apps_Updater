@@ -86,13 +86,13 @@ android {
 }
 
 room {
-    schemaDirectory("$projectDir/schemas")
+    schemaDirectory("$rootDir/schemas")
 }
 
 dependencies {
     compileOnly(fileTree(mapOf("dir" to "../system_libs", "include" to listOf("*.jar"))))
 
-    debugImplementation(files("../system_libs/SettingsLib.jar", "../system_libs/SpaLib.jar"))
+    debugImplementation(files("../system_libs/SettingsLib.jar", "../system_libs/SpaLib.jar", "../system_libs/uwuComposeSettingsLib.jar"))
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.lottie.compose)
 
@@ -111,6 +111,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation("org.jsoup:jsoup:1.17.2")
 
     annotationProcessor(libs.androidx.room.compiler)
 }

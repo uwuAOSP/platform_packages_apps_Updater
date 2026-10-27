@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The uwuAOSP Project
+     SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <string name="uwu_version">uwuAOSP version</string>
+    <string name="uwu_device">Device</string>
+    <string name="uwu_maintainer">Maintainer</string>
+    <string name="uwu_android">Android version</string>
+    <string name="uwu_security">Security patch</string>
+    <string name="uwu_build_date">Build date</string>
+    <string name="uwu_changelog">Changelog</string>
+    <string name="uwu_changelog_missing">This version seems to have no changelog</string>
+    <string name="uwu_view_source">View on the uwuAOSP website</string>
+    <string name="uwu_source_unconfigured">Update source is not configured</string>
+    <string name="uwu_not_checked">Check for system updates</string>
+    <string name="uwu_up_to_date">Your system is up to date</string>
+    <string name="uwu_status_reference">Your system is up to date</string>
+    <string name="uwu_new_version_found">New version found</string>
+    <string name="uwu_update_available">A system update is available</string>
+    <string name="uwu_unknown">Not available</string>
+    <string name="uwu_more_options">More options</string>
+    <string name="uwu_close">Close</string>
+    <string name="uwu_importing">Importing and verifying update</string>
+</resources>

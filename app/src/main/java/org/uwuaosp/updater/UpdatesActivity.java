@@ -5,7 +5,6 @@
 package org.uwuaosp.updater;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -51,7 +50,7 @@ public class UpdatesActivity extends UpdatesScaffoldActivity implements UpdateIm
             });
 
     private UpdateImporter mUpdateImporter;
-    private AlertDialog importDialog;
+    private boolean mBound;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,7 +85,7 @@ public class UpdatesActivity extends UpdatesScaffoldActivity implements UpdateIm
         super.onStart();
         Intent intent = new Intent(this, UpdaterService.class);
         startService(intent);
-        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+        mBound = bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(UpdaterController.ACTION_UPDATE_STATUS);
@@ -98,22 +97,25 @@ public class UpdatesActivity extends UpdatesScaffoldActivity implements UpdateIm
 
     @Override
     protected void onPause() {
-        if (importDialog != null) {
-            importDialog.dismiss();
-            importDialog = null;
-            mUpdateImporter.stopImport();
-        }
-
         super.onPause();
     }
 
     @Override
     public void onStop() {
         unregisterReceiver(mBroadcastReceiver);
-        if (mUpdaterService != null) {
+        if (mBound) {
             unbindService(mConnection);
+            mBound = false;
         }
+        setUpdaterController(null);
+        mUpdaterService = null;
         super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        mUpdateImporter.stopImport();
+        super.onDestroy();
     }
 
     @Override
@@ -135,42 +137,17 @@ public class UpdatesActivity extends UpdatesScaffoldActivity implements UpdateIm
 
     @Override
     public void onImportStarted() {
-        if (importDialog != null && importDialog.isShowing()) {
-            importDialog.dismiss();
-        }
-
-        importDialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.local_update_import)
-                .setView(R.layout.progress_dialog)
-                .setCancelable(false)
-                .create();
-
-        importDialog.show();
+        showImportProgress();
     }
 
     @Override
     public void onImportCompleted(Update update) {
-        if (importDialog != null) {
-            importDialog.dismiss();
-            importDialog = null;
-        }
-
         if (update == null) {
-            new AlertDialog.Builder(this)
-                    .setTitle(R.string.local_update_import)
-                    .setMessage(R.string.local_update_import_failure)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show();
+            showImportResult(getString(R.string.local_update_import_failure));
             return;
         }
-
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.local_update_import_success_title)
-                .setMessage(getString(
-                        R.string.local_update_import_success_message,
-                        StringUtil.formatBuildDate(this, update.getTimestamp())))
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
+        showImportResult(getString(R.string.local_update_import_success_message,
+                StringUtil.formatBuildDate(this, update.getTimestamp())));
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {
@@ -206,11 +183,13 @@ public class UpdatesActivity extends UpdatesScaffoldActivity implements UpdateIm
     }
 
     private void handleDownloadStatusChange(String downloadId) {
+        if (mUpdaterService == null || downloadId == null) return;
         if (Update.LOCAL_ID.equals(downloadId)) {
             return;
         }
 
         Update update = mUpdaterService.getUpdaterController().getUpdate(downloadId);
+        if (update == null) return;
         switch (update.getStatus()) {
             case PAUSED_ERROR:
                 showToast(R.string.snack_download_failed, Toast.LENGTH_LONG);

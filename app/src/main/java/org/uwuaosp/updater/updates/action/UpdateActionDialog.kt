@@ -29,7 +29,7 @@ fun UpdateActionDialog(
 ) {
     SettingsAlertDialogWithIcon(
         onDismissRequest = onDismiss,
-        icon = ImageVector.vectorResource(R.drawable.ic_notification),
+        icon = ImageVector.vectorResource(R.drawable.ic_uwu_version),
         confirmButton = AlertDialogButton(text = stringResource(android.R.string.ok)) {
             onDismiss()
             dialog.onConfirm()

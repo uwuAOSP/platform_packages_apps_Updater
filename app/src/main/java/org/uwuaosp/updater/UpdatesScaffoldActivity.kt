@@ -1,65 +1,91 @@
 /*
  * SPDX-FileCopyrightText: The LineageOS Project
+ * SPDX-FileCopyrightText: 2026 The uwuAOSP Project
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.uwuaosp.updater
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import com.android.settingslib.spa.framework.compose.LocalNavController
-import com.android.settingslib.spa.framework.compose.NavControllerWrapper
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.android.settingslib.spa.framework.theme.SettingsTheme
-import com.android.settingslib.spa.widget.preference.Preference
-import com.android.settingslib.spa.widget.preference.PreferenceModel
-import com.android.settingslib.spa.widget.scaffold.SettingsScaffold
-import com.android.settingslib.spa.widget.ui.Category
+import org.uwuaosp.compose.settingslib.PreferenceRow
+import org.uwuaosp.compose.settingslib.SettingsCollapsingAppBarScaffold
+import org.uwuaosp.compose.settingslib.SettingsPreferenceGroup
 import org.uwuaosp.updater.controller.UpdaterController
 import org.uwuaosp.updater.data.Update
-import org.uwuaosp.updater.data.UpdateStatus
-import org.uwuaosp.updater.deviceinfo.DeviceInfoBanner
+import org.uwuaosp.updater.deviceinfo.DeviceInfoUtils
 import org.uwuaosp.updater.preferences.PreferencesActivity
-import org.uwuaosp.updater.updates.UpdateList
+import org.uwuaosp.updater.ui.ChangelogSheet
+import org.uwuaosp.updater.ui.UpdatePackageCard
+import org.uwuaosp.updater.ui.UwuHero
 import org.uwuaosp.updater.updates.action.AlertDialogState
 import org.uwuaosp.updater.updates.action.UpdateActionDialog
 import org.uwuaosp.updater.updates.action.UpdateActionHandler
 import org.uwuaosp.updater.updates.state.UpdateItemStateMapper
-import org.uwuaosp.updater.updatescheck.UpdatesCheck
-import org.uwuaosp.updater.updatescheck.UpdatesCheckModel
-import org.uwuaosp.updater.updatescheck.rememberUpdatesCheckUiState
+import org.uwuaosp.updater.util.StringUtil
 
 abstract class UpdatesScaffoldActivity : ComponentActivity() {
     private val viewModel by viewModels<UpdatesViewModel>()
-    private var activeUpdaterController: UpdaterController? by mutableStateOf(null)
-    private var controllerStateVersion: Int by mutableIntStateOf(0)
+    private var activeController: UpdaterController? by mutableStateOf(null)
+    private var controllerRevision by mutableIntStateOf(0)
+    private var importing by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,44 +94,52 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
 
     protected fun setupCompose() {
         setContent {
-            val navController = remember {
-                object : NavControllerWrapper {
-                    override fun navigate(route: String, popUpCurrent: Boolean) {}
-                    override fun navigateBack() = finish()
+            SettingsTheme {
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                val owner = LocalLifecycleOwner.current
+                LaunchedEffect(viewModel, owner) {
+                    owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        viewModel.feedback.collect { message ->
+                            Toast.makeText(this@UpdatesScaffoldActivity, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
-            }
-
-            CompositionLocalProvider(LocalNavController provides navController) {
-                SettingsTheme {
-                    val uiState by viewModel.uiState.collectAsState()
-                    UpdatesScaffoldContent(
-                        uiState = uiState,
-                        updaterController = activeUpdaterController,
-                        controllerStateVersion = controllerStateVersion,
-                        onRefreshClick = { onRefreshClick() },
-                        onLocalUpdateClick = { onLocalUpdateClick() },
-                        onPreferencesClick = {
-                            startActivity(
-                                Intent(
-                                    this@UpdatesScaffoldActivity,
-                                    PreferencesActivity::class.java,
-                                )
-                            )
-                        },
-                        onControllerStateChanged = { notifyControllerStateChanged() },
-                    )
-                }
+                UpdatesContent(uiState, activeController, controllerRevision,
+                    onBack = { finish() }, onRefresh = { onRefreshClick() },
+                    onImport = { onLocalUpdateClick() },
+                    onPreferences = { startActivity(Intent(this, PreferencesActivity::class.java)) },
+                    activity = this)
+                ImportDialogs()
             }
         }
     }
 
     protected fun setUpdaterController(controller: UpdaterController?) {
-        activeUpdaterController = controller
+        activeController = controller
         notifyControllerStateChanged()
     }
 
-    protected fun notifyControllerStateChanged() {
-        controllerStateVersion++
+    protected fun notifyControllerStateChanged() { controllerRevision++ }
+    protected fun showImportProgress() { importing = true }
+    protected fun hideImportProgress() { importing = false }
+    protected fun showImportResult(message: String) {
+        importing = false
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+    @Composable
+    private fun ImportDialogs() {
+        if (importing) AlertDialog(onDismissRequest = {}, confirmButton = {},
+            title = { Text(stringResource(R.string.local_update_import)) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LoadingIndicator()
+                    Text(stringResource(R.string.uwu_importing))
+                }
+            })
     }
 
     open fun onRefreshClick() {}
@@ -113,268 +147,160 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
     open fun exportUpdate(update: Update) {}
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun UpdatesScaffoldContent(
-    uiState: UpdatesViewModel.UiState,
-    updaterController: UpdaterController?,
-    controllerStateVersion: Int,
-    onRefreshClick: () -> Unit,
-    onLocalUpdateClick: () -> Unit,
-    onPreferencesClick: () -> Unit,
-    onControllerStateChanged: () -> Unit,
+private fun UpdatesContent(
+    state: UpdatesViewModel.UiState, controller: UpdaterController?, revision: Int,
+    onBack: () -> Unit, onRefresh: () -> Unit, onImport: () -> Unit,
+    onPreferences: () -> Unit, activity: UpdatesScaffoldActivity,
 ) {
-    val title = getTitleForUpdateStatus(uiState.updates)
-
-    val actionDialogState = remember { mutableStateOf<AlertDialogState?>(null) }
-    actionDialogState.value?.let { dialog ->
-        UpdateActionDialog(
-            dialog = dialog,
-            onDismiss = { actionDialogState.value = null },
-        )
+    val application = activity.application as UpdaterApplication
+    val network by application.networkMonitor.networkState.collectAsStateWithLifecycle(
+        application.networkMonitor.currentNetworkState)
+    val streaming by application.userPreferencesRepository.streamUpdatesFlow.collectAsStateWithLifecycle(true)
+    var menu by remember { mutableStateOf(false) }
+    var changelog by remember { mutableStateOf(false) }
+    var dialog by remember { mutableStateOf<AlertDialogState?>(null) }
+    val items = remember(state.updates, controller, revision, streaming, network) {
+        controller?.let {
+            val mapper = UpdateItemStateMapper(activity, it, streaming)
+            state.updates.mapNotNull { update -> it.getUpdate(update.downloadId)?.let { actual -> mapper.map(actual, network) } }
+        }.orEmpty()
     }
-
-    SettingsScaffold(title = title) { paddingValues ->
-        if (isWideScreen()) {
-            WideUpdatesScaffold(
-                paddingValues = paddingValues,
-                updatesCheckModel = uiState.updatesCheckModel,
-                updates = uiState.updates,
-                updaterController = updaterController,
-                controllerStateVersion = controllerStateVersion,
-                showDialog = { actionDialogState.value = it },
-                onControllerStateChanged = onControllerStateChanged,
-                onRefreshClick = onRefreshClick,
-                onLocalUpdateClick = onLocalUpdateClick,
-                onPreferencesClick = onPreferencesClick,
-            )
-        } else {
-            UpdatesScaffold(
-                paddingValues = paddingValues,
-                updatesCheckModel = uiState.updatesCheckModel,
-                updates = uiState.updates,
-                updaterController = updaterController,
-                controllerStateVersion = controllerStateVersion,
-                showDialog = { actionDialogState.value = it },
-                onControllerStateChanged = onControllerStateChanged,
-                onRefreshClick = onRefreshClick,
-                onLocalUpdateClick = onLocalUpdateClick,
-                onPreferencesClick = onPreferencesClick,
-            )
-        }
+    val actions = remember(controller) {
+        controller?.let { UpdateActionHandler(activity, it, { update -> activity.exportUpdate(update) }, { dialog = it }) }
     }
-}
+    val upToDate = state.sourceConfigured && state.isOnline && state.hasCheckedSuccessfully &&
+        !state.isCheckingForUpdates && !state.hasUpdateCheckFailed && state.updates.isEmpty()
+    val newVersion = state.updates.any { it.timestamp > DeviceInfoUtils.buildDateTimestamp }
+    if (changelog) ChangelogSheet { changelog = false }
+    dialog?.let { value -> UpdateActionDialog(value) { dialog = null } }
 
-@Composable
-private fun WideUpdatesScaffold(
-    paddingValues: PaddingValues,
-    updatesCheckModel: UpdatesCheckModel,
-    updates: List<Update>,
-    updaterController: UpdaterController?,
-    controllerStateVersion: Int,
-    showDialog: (AlertDialogState) -> Unit,
-    onControllerStateChanged: () -> Unit,
-    onRefreshClick: () -> Unit,
-    onLocalUpdateClick: () -> Unit,
-    onPreferencesClick: () -> Unit,
-) {
-    val layoutDirection = LocalLayoutDirection.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                top = paddingValues.calculateTopPadding(),
-                start = paddingValues.calculateStartPadding(layoutDirection),
-                end = paddingValues.calculateEndPadding(layoutDirection),
-            )
-    ) {
-        UpdatesInformationPane(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = paddingValues.calculateBottomPadding()),
-        )
-        UpdatesActionPane(
-            model = updatesCheckModel,
-            updates = updates,
-            updaterController = updaterController,
-            controllerStateVersion = controllerStateVersion,
-            showDialog = showDialog,
-            onControllerStateChanged = onControllerStateChanged,
-            onRefreshClick = onRefreshClick,
-            onLocalUpdateClick = onLocalUpdateClick,
-            onPreferencesClick = onPreferencesClick,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = paddingValues.calculateBottomPadding()),
-        )
-    }
-}
-
-@Composable
-private fun UpdatesScaffold(
-    paddingValues: PaddingValues,
-    updatesCheckModel: UpdatesCheckModel,
-    updates: List<Update>,
-    updaterController: UpdaterController?,
-    controllerStateVersion: Int,
-    showDialog: (AlertDialogState) -> Unit,
-    onControllerStateChanged: () -> Unit,
-    onRefreshClick: () -> Unit,
-    onLocalUpdateClick: () -> Unit,
-    onPreferencesClick: () -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .verticalScroll(rememberScrollState())
-    ) {
-        UpdatesInformationPane()
-        UpdatesActionPane(
-            model = updatesCheckModel,
-            updates = updates,
-            updaterController = updaterController,
-            controllerStateVersion = controllerStateVersion,
-            showDialog = showDialog,
-            onControllerStateChanged = onControllerStateChanged,
-            onRefreshClick = onRefreshClick,
-            onLocalUpdateClick = onLocalUpdateClick,
-            onPreferencesClick = onPreferencesClick,
-        )
-    }
-}
-
-@Composable
-private fun UpdatesInformationPane(
-    modifier: Modifier = Modifier,
-) {
-    DeviceInfoBanner(modifier = modifier)
-}
-
-@Composable
-private fun UpdatesActionPane(
-    model: UpdatesCheckModel,
-    updates: List<Update>,
-    updaterController: UpdaterController?,
-    controllerStateVersion: Int,
-    showDialog: (AlertDialogState) -> Unit,
-    onControllerStateChanged: () -> Unit,
-    onRefreshClick: () -> Unit,
-    onLocalUpdateClick: () -> Unit,
-    onPreferencesClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = context as UpdatesScaffoldActivity
-    val networkMonitor =
-        remember { (context.applicationContext as UpdaterApplication).networkMonitor }
-    val networkState by networkMonitor.networkState.collectAsState(
-        initial = networkMonitor.currentNetworkState,
-    )
-    val userPreferencesRepository =
-        remember { (context.applicationContext as UpdaterApplication).userPreferencesRepository }
-    val streamUpdatesEnabled by userPreferencesRepository.streamUpdatesFlow.collectAsState(
-        initial = true,
-    )
-
-    val updateItems = remember(
-        updates,
-        updaterController,
-        networkState,
-        streamUpdatesEnabled,
-        controllerStateVersion,
-    ) {
-        val controller = updaterController ?: return@remember emptyList()
-        val mapper = UpdateItemStateMapper(context, controller, streamUpdatesEnabled)
-        updates.mapNotNull { update ->
-            controller.getUpdate(update.downloadId)?.let {
-                mapper.map(it, networkState)
+    SettingsCollapsingAppBarScaffold(title = stringResource(R.string.display_name),
+        showBackButton = true, onNavigateUp = onBack, containerColor = MaterialTheme.colorScheme.surface,
+        actions = {
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(painterResource(R.drawable.ic_uwu_more), stringResource(R.string.uwu_more_options)) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_preferences)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_uwu_settings), null) },
+                        onClick = { menu = false; onPreferences() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.local_update_import)) },
+                        enabled = controller != null && !controller.isBusy,
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_uwu_upload), null) },
+                        onClick = { menu = false; onImport() })
+                }
+            }
+        }) { padding ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).navigationBarsPadding()) {
+            val header: @Composable () -> Unit = {
+                UwuHero(upToDate)
+                val maintainer = DeviceInfoUtils.maintainer.trim()
+                if (maintainer.isNotEmpty()) {
+                    val description = "${stringResource(R.string.uwu_maintainer)}: $maintainer"
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Surface(shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description }) {
+                            Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(R.drawable.ic_uwu_person), null, Modifier.size(16.dp))
+                                Text(maintainer, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+                UpdateCheckControl(state.isCheckingForUpdates, newVersion, onRefresh)
+            }
+            val info: @Composable () -> Unit = {
+                SystemInformation()
+                SettingsPreferenceGroup {
+                    item {
+                        PreferenceRow(title = stringResource(R.string.uwu_changelog),
+                            summary = "uwuAOSP ${DeviceInfoUtils.buildVersion}",
+                            icon = ImageVector.vectorResource(R.drawable.ic_uwu_article), onClick = { changelog = true })
+                    }
+                }
+            }
+            val updates: @Composable () -> Unit = {
+                items.forEach { item ->
+                    key(item.downloadId) {
+                        UpdatePackageCard(item) { action ->
+                            val update = controller?.getUpdate(item.downloadId)
+                            if (update != null && action.enabled) actions?.perform(action, update)
+                        }
+                    }
+                }
+            }
+            if (maxWidth >= 600.dp) {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)) { header(); info() }
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)) { updates() }
+                }
+            } else {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) { header(); updates(); info() }
             }
         }
     }
+}
 
-    val actionHandler = remember(updaterController) {
-        updaterController?.let { controller ->
-            UpdateActionHandler(
-                activity = activity,
-                updaterController = controller,
-                exportUpdate = { update -> activity.exportUpdate(update) },
-                showDialog = showDialog,
-            )
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UpdateCheckControl(checking: Boolean, found: Boolean, onCheck: () -> Unit) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val reference = measurer.measure(stringResource(R.string.uwu_status_reference), MaterialTheme.typography.headlineSmall)
+    val label = stringResource(when {
+        found -> R.string.uwu_new_version_found
+        checking -> R.string.checking_for_updates
+        else -> R.string.check_for_updates
+    })
+    val labelSize = measurer.measure(label, MaterialTheme.typography.labelLarge)
+    val height = with(density) { reference.size.height.toDp() }.coerceAtLeast(ButtonDefaults.ExtraSmallContainerHeight)
+    val padding = ButtonDefaults.contentPaddingFor(height)
+    val contentWidth = with(density) { labelSize.size.width.toDp() } + ButtonDefaults.ExtraSmallIconSize +
+        ButtonDefaults.ExtraSmallIconSpacing + padding.calculateLeftPadding(direction) + padding.calculateRightPadding(direction)
+    val width = with(density) { reference.size.width.toDp() }.coerceAtLeast(contentWidth)
+    Box(Modifier.fillMaxWidth().padding(bottom = 20.dp), contentAlignment = Alignment.Center) {
+        if (found) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.width(width).height(height)) {
+                Box(contentAlignment = Alignment.Center) { Text(label, style = MaterialTheme.typography.labelLarge) }
+            }
+        } else {
+            FilledTonalButton(onClick = onCheck, enabled = !checking,
+                shapes = ButtonDefaults.shapes(), contentPadding = padding,
+                modifier = Modifier.width(width).height(height)) {
+                if (checking) LoadingIndicator(Modifier.size(ButtonDefaults.ExtraSmallIconSize))
+                else Icon(painterResource(R.drawable.ic_uwu_refresh), null, Modifier.size(ButtonDefaults.ExtraSmallIconSize))
+                Text(label, Modifier.padding(start = ButtonDefaults.ExtraSmallIconSpacing), maxLines = 1)
+            }
         }
     }
-    val updatesCheckUiState = rememberUpdatesCheckUiState(model.state)
+}
 
-    Column(modifier = modifier) {
-        UpdatesCheck(
-            model = model,
-            uiState = updatesCheckUiState,
-            onCheckClick = onRefreshClick,
-        )
-        UpdateList(
-            items = updateItems,
-            isUpdatesCheckStatusVisible = updatesCheckUiState.isStatusVisible,
-            onAction = { action, downloadId ->
-                val controller = updaterController ?: return@UpdateList
-                val update = controller.getUpdate(downloadId) ?: return@UpdateList
-                actionHandler?.perform(action, update)
-                onControllerStateChanged()
-            },
-        )
-        UpdatesFooter(
-            onLocalUpdateClick = onLocalUpdateClick,
-            onPreferencesClick = onPreferencesClick,
-        )
+@Composable
+private fun SystemInformation() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val unknown = stringResource(R.string.uwu_unknown)
+    val rows = listOf(
+        Triple(R.string.uwu_version, DeviceInfoUtils.buildVersion, R.drawable.ic_uwu_version),
+        Triple(R.string.uwu_device, "${Build.MODEL} (${DeviceInfoUtils.device})", R.drawable.ic_uwu_device),
+        Triple(R.string.uwu_android, DeviceInfoUtils.androidVersion, R.drawable.ic_uwu_android),
+        Triple(R.string.uwu_security, DeviceInfoUtils.buildSecurityPatch.takeIf { it.isNotBlank() }
+            ?.let { StringUtil.formatSecurityPatch(context, it) }.orEmpty(), R.drawable.ic_uwu_security),
+        Triple(R.string.uwu_build_date, if (DeviceInfoUtils.buildDateTimestamp > 0)
+            StringUtil.formatBuildDate(context, DeviceInfoUtils.buildDateTimestamp) else "", R.drawable.ic_uwu_calendar),
+    )
+    SettingsPreferenceGroup {
+        rows.forEach { (title, value, icon) -> item {
+            PreferenceRow(title = stringResource(title), summary = value.ifBlank { unknown },
+                icon = ImageVector.vectorResource(icon))
+        } }
     }
-}
-
-@Composable
-private fun isWideScreen(): Boolean {
-    val minWideScreenWidth = 600.dp
-    val density = LocalDensity.current
-    val windowSize = LocalWindowInfo.current.containerSize
-
-    return with(density) { windowSize.width.toDp() >= minWideScreenWidth }
-}
-
-@Composable
-private fun UpdatesFooter(
-    onLocalUpdateClick: () -> Unit,
-    onPreferencesClick: () -> Unit,
-) {
-    val localUpdateSummary = stringResource(R.string.local_update_import_summary)
-    val preferencesSummary = stringResource(R.string.preferences_summary)
-
-    Category {
-        Preference(object : PreferenceModel {
-            override val title = stringResource(R.string.local_update_import)
-            override val summary = { localUpdateSummary }
-            override val onClick = onLocalUpdateClick
-        })
-        Preference(object : PreferenceModel {
-            override val title = stringResource(R.string.menu_preferences)
-            override val summary = { preferencesSummary }
-            override val onClick = onPreferencesClick
-        })
-    }
-}
-
-@Composable
-private fun getTitleForUpdateStatus(updates: List<Update>): String = when {
-    updates.any { it.status == UpdateStatus.UPDATED_NEED_REBOOT } ->
-        stringResource(R.string.installing_update_finished)
-
-    updates.any { it.status == UpdateStatus.INSTALLATION_FAILED } ->
-        stringResource(R.string.installing_update_error)
-
-    updates.any {
-        it.status == UpdateStatus.INSTALLING ||
-                it.status == UpdateStatus.INSTALLATION_SUSPENDED
-    } -> stringResource(R.string.installing_update)
-
-    else -> stringResource(R.string.display_name)
 }

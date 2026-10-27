@@ -1,0 +1,20 @@
+uwuAOSP Updater
+
+Based on LineageOS/android_packages_apps_Updater, lineage-24.0,
+revision 6d50e0bf1b16fe7bca818375a3e734f4959e2e57.
+Original copyright and SPDX notices are retained in the source files.
+
+The native UI follows the project's SystemUpdatesDemo design. Its earlier
+layout reference was AxionAOSP/android_packages_apps_Updater,
+revision 24a0e5eef0a71dc3dc251c6e91a6cc2cd8838144, and android_axion_sdk,
+revision 2e45834738ac67a7eb92e3782ec558e456436ff5.
+Copyright (C) 2025-2026 AxionOS. Apache-2.0.
+
+Material Symbols Rounded assets: Copyright Google LLC. Apache-2.0.
+Source: https://github.com/google/material-design-icons
+Revision: 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7
+
+The three fixed hero contours originate from the uwuAOSP boot animation.
+Copyright 2026 UwUniverse. Apache-2.0.
+The project-supplied uwuAOSP branding SVG was converted to VectorDrawable
+with Google's Svg2Vector tool; its artwork and colors are preserved.

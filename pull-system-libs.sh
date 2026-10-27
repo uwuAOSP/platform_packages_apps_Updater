@@ -13,6 +13,7 @@ declare -A jars=(
   ["framework.jar"]="$out_dir/soong/.intermediates/frameworks/base/framework-minus-apex/android_common/combined/framework.jar"
   ["SettingsLib.jar"]="$out_dir/soong/.intermediates/frameworks/base/packages/SettingsLib/SettingsLib/android_common/turbine-combined/SettingsLib.jar"
   ["SpaLib.jar"]="$out_dir/soong/.intermediates/frameworks/base/packages/SettingsLib/Spa/spa/SpaLib/android_common/kotlin/SpaLib.jar"
+  ["uwuComposeSettingsLib.jar"]="$out_dir/soong/.intermediates/uwu-sdk/uwuCompose/uwuComposeSettingsLib/android_common/kotlin/uwuComposeSettingsLib.jar"
 )
 
 missing=0

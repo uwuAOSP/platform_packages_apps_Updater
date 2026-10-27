@@ -39,6 +39,7 @@ class UpdateActionHandler(
     private val userPreferencesRepository = application.userPreferencesRepository
 
     fun perform(action: UpdateAction, update: Update) {
+        if (!action.enabled) return
         val downloadId = update.downloadId
         when (action.type) {
             UpdateActionType.START_DOWNLOAD -> runWithActiveDownloadWarning(update) {
