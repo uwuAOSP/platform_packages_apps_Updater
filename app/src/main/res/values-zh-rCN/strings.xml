@@ -132,4 +132,23 @@
     <string name="local_update_import_success_message">构建日期：<xliff:g id="build_date" example="Apr 27">%1$s</xliff:g>\n\n点击已导入的更新以查看可用操作。</string>
     <string name="local_update_import_failure">导入本地更新失败</string>
     <string name="local_update_name">本地更新</string>
+    <string name="uwu_version">uwuAOSP 版本</string>
+    <string name="uwu_device">设备名称</string>
+    <string name="uwu_maintainer">维护者</string>
+    <string name="uwu_android">Android 版本</string>
+    <string name="uwu_security">安全补丁</string>
+    <string name="uwu_build_date">构建日期</string>
+    <string name="uwu_changelog">更新日志</string>
+    <string name="uwu_changelog_missing">这个版本好像没有更新日志</string>
+    <string name="uwu_view_source">查看官网原文</string>
+    <string name="uwu_source_unconfigured">未配置更新源</string>
+    <string name="uwu_not_checked">检查系统更新</string>
+    <string name="uwu_up_to_date">已经是最新版本</string>
+    <string name="uwu_status_reference">已是最新版本</string>
+    <string name="uwu_new_version_found">发现新版本</string>
+    <string name="uwu_update_available">有可用的系统更新</string>
+    <string name="uwu_unknown">暂无信息</string>
+    <string name="uwu_more_options">更多选项</string>
+    <string name="uwu_close">关闭</string>
+    <string name="uwu_importing">正在导入并校验更新包</string>
 </resources>
