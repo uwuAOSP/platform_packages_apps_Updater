@@ -28,6 +28,7 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.uwuaosp.updater.R
 import org.uwuaosp.updater.updates.action.UpdateAction
@@ -54,15 +56,17 @@ import org.uwuaosp.updater.updates.state.UpdateItemState
 fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) {
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(letterSpacing = 0.sp)
+    val bodyStyle = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.sp)
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
         shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("uwuAOSP ${state.buildVersion}", style = MaterialTheme.typography.titleMedium)
-                    Text("${state.fileSize} - ${state.buildDate}", style = MaterialTheme.typography.bodySmall,
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("uwuAOSP ${state.buildVersion}", style = titleStyle)
+                    Text("${state.fileSize} - ${state.buildDate}", style = bodyStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (state.status.isNotEmpty()) Text(state.status, style = MaterialTheme.typography.bodySmall)
+                    if (state.status.isNotEmpty()) Text(state.status, style = bodyStyle)
                 }
                 if (state.actions.overflow.isNotEmpty()) {
                     androidx.compose.foundation.layout.Box {
@@ -81,10 +85,12 @@ fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) 
             }
             state.progress?.let { progress -> PackageProgress(progress, state) }
             if (state.progress == null) {
-                if (state.securityUpdate.isNotBlank()) Text(state.securityUpdate, style = MaterialTheme.typography.bodySmall)
-                Text(if (state.installNote == R.string.list_major_upgrade_recovery_install)
-                    stringResource(state.installNote, stringResource(R.string.brand_name))
-                    else stringResource(state.installNote), style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (state.securityUpdate.isNotBlank()) Text(state.securityUpdate, style = bodyStyle)
+                    Text(if (state.installNote == R.string.list_major_upgrade_recovery_install)
+                        stringResource(state.installNote, stringResource(R.string.brand_name))
+                        else stringResource(state.installNote), style = bodyStyle)
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 state.actions.secondary?.let { action ->
@@ -120,14 +126,17 @@ private fun PackageProgress(progress: ProgressState, state: UpdateItemState) {
         is ProgressState.Determinate -> {
             val value = animateFloatAsState((progress.percent / 100).coerceIn(0f, 1f), spring(dampingRatio = 1f, stiffness = 400f), label = "OTA progress")
             LinearWavyProgressIndicator(progress = { value.value }, modifier = Modifier.fillMaxWidth().height(16.dp),
-                stroke = stroke, trackStroke = stroke, wavelength = 28.dp, waveSpeed = speed, gapSize = 4.dp, stopSize = 4.dp)
+                stroke = stroke, trackStroke = stroke,
+                amplitude = { WavyProgressIndicatorDefaults.indicatorAmplitude(it) * 0.35f },
+                wavelength = 28.dp, waveSpeed = speed, gapSize = 4.dp, stopSize = 4.dp)
             Text("${progress.percent.toInt()}%", Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             if (progress.downloadedSize.isNotEmpty()) Text(listOf(progress.downloadedSize, progress.eta)
                 .filter { it.isNotEmpty() }.joinToString(" - "), style = MaterialTheme.typography.bodySmall)
         }
         ProgressState.Indeterminate -> LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().height(16.dp),
-            stroke = stroke, trackStroke = stroke, wavelength = 20.dp, waveSpeed = speed, gapSize = 4.dp)
+            stroke = stroke, trackStroke = stroke, amplitude = 0.35f,
+            wavelength = 28.dp, waveSpeed = speed, gapSize = 4.dp)
     }
 }
 

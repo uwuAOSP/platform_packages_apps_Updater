@@ -5,12 +5,14 @@
 
 package org.uwuaosp.updater.updates.action
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.sp
 import com.android.settingslib.spa.widget.dialog.AlertDialogButton
 import com.android.settingslib.spa.widget.dialog.SettingsAlertDialogWithIcon
 import org.uwuaosp.updater.R
@@ -42,6 +44,14 @@ fun UpdateActionDialog(
             null
         },
         title = dialog.title,
-        text = { Text(text = dialog.text) },
+        text = {
+            Text(
+                text = dialog.text,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    letterSpacing = 0.sp,
+                    lineHeight = 18.sp,
+                ),
+            )
+        },
     )
 }

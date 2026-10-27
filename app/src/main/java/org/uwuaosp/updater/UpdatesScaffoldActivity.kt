@@ -15,18 +15,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +54,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -66,10 +62,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.settingslib.spa.framework.theme.SettingsTheme
 import org.uwuaosp.compose.settingslib.PreferenceRow
-import org.uwuaosp.compose.settingslib.SettingsCollapsingAppBarScaffold
 import org.uwuaosp.compose.settingslib.SettingsPreferenceGroup
+import org.uwuaosp.compose.settingslib.SettingsScaffold
 import org.uwuaosp.updater.controller.UpdaterController
 import org.uwuaosp.updater.data.Update
+import org.uwuaosp.updater.data.UpdateStatus
 import org.uwuaosp.updater.deviceinfo.DeviceInfoUtils
 import org.uwuaosp.updater.preferences.PreferencesActivity
 import org.uwuaosp.updater.ui.ChangelogSheet
@@ -135,9 +132,17 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
         if (importing) AlertDialog(onDismissRequest = {}, confirmButton = {},
             title = { Text(stringResource(R.string.local_update_import)) },
             text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     LoadingIndicator()
-                    Text(stringResource(R.string.uwu_importing))
+                    Text(
+                        text = stringResource(R.string.uwu_importing),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                    )
                 }
             })
     }
@@ -170,14 +175,24 @@ private fun UpdatesContent(
     val actions = remember(controller) {
         controller?.let { UpdateActionHandler(activity, it, { update -> activity.exportUpdate(update) }, { dialog = it }) }
     }
-    val upToDate = state.sourceConfigured && state.isOnline && state.hasCheckedSuccessfully &&
-        !state.isCheckingForUpdates && !state.hasUpdateCheckFailed && state.updates.isEmpty()
     val newVersion = state.updates.any { it.timestamp > DeviceInfoUtils.buildDateTimestamp }
+    val hasPausedOrFailedUpdate = (controller?.updates ?: state.updates).any { update ->
+        when (update.status) {
+            UpdateStatus.PAUSED,
+            UpdateStatus.PAUSED_ERROR,
+            UpdateStatus.VERIFICATION_FAILED,
+            UpdateStatus.INSTALLATION_FAILED,
+            UpdateStatus.INSTALLATION_SUSPENDED -> true
+            else -> false
+        }
+    }
+    val showUpdateAnimation = newVersion || controller?.isBusy == true ||
+        hasPausedOrFailedUpdate || state.hasUpdateCheckFailed
     if (changelog) ChangelogSheet { changelog = false }
     dialog?.let { value -> UpdateActionDialog(value) { dialog = null } }
 
-    SettingsCollapsingAppBarScaffold(title = stringResource(R.string.display_name),
-        showBackButton = true, onNavigateUp = onBack, containerColor = MaterialTheme.colorScheme.surface,
+    SettingsScaffold(title = stringResource(R.string.display_name),
+        showBackButton = true, onNavigateUp = onBack, startCollapsed = false,
         actions = {
             Box {
                 IconButton(onClick = { menu = true }) { Icon(painterResource(R.drawable.ic_uwu_more), stringResource(R.string.uwu_more_options)) }
@@ -191,10 +206,10 @@ private fun UpdatesContent(
                         onClick = { menu = false; onImport() })
                 }
             }
-        }) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).navigationBarsPadding()) {
+        }) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val header: @Composable () -> Unit = {
-                UwuHero(upToDate)
+                UwuHero(showUpdateAnimation = showUpdateAnimation)
                 val maintainer = DeviceInfoUtils.maintainer.trim()
                 if (maintainer.isNotEmpty()) {
                     val description = "${stringResource(R.string.uwu_maintainer)}: $maintainer"
@@ -233,17 +248,9 @@ private fun UpdatesContent(
                     }
                 }
             }
-            if (maxWidth >= 600.dp) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)) { header(); info() }
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)) { updates() }
-                }
-            } else {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)) { header(); updates(); info() }
-            }
+            header()
+            updates()
+            info()
         }
     }
 }

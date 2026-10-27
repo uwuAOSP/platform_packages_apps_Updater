@@ -34,20 +34,20 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun UwuHero(upToDate: Boolean) {
+fun UwuHero(showUpdateAnimation: Boolean) {
     var running by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {
         running = ValueAnimator.areAnimatorsEnabled()
         onPauseOrDispose { running = false }
     }
     Box(Modifier.fillMaxWidth().height(164.dp), contentAlignment = Alignment.Center) {
-        if (upToDate) {
-            Image(painterResource(R.drawable.uwu_branding), null, Modifier.size(328.dp, 164.dp))
-        } else {
-            // 饼干位于另外两个图形后面，轮廓和参数来自最终演示
+        if (showUpdateAnimation) {
+            // Keep the cookie behind the other shapes, matching the final demo.
             HeroShape(R.drawable.uwu_cookie, Color(0xFF8F8EE8), 2, 30f, 20f, .34f, -7f, running)
             HeroShape(R.drawable.uwu_star, Color(0xFF78DCFD), 0, 0f, -25f, .38f, -12f, running)
             HeroShape(R.drawable.uwu_cross, Color(0xFFD0D0FD), 1, -30f, 20f, .29f, 9f, running)
+        } else {
+            Image(painterResource(R.drawable.uwu_branding), null, Modifier.size(328.dp, 164.dp))
         }
     }
 }
