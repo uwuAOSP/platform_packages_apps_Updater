@@ -60,10 +60,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.android.settingslib.spa.framework.theme.SettingsTheme
-import org.uwuaosp.compose.settingslib.PreferenceRow
-import org.uwuaosp.compose.settingslib.SettingsPreferenceGroup
-import org.uwuaosp.compose.settingslib.SettingsScaffold
+import org.uwuaosp.compose.framework.theme.SettingsTheme
+import org.uwuaosp.compose.widget.preference.PreferenceRow
+import org.uwuaosp.compose.widget.preference.SettingsPreferenceGroup
+import org.uwuaosp.compose.widget.scaffold.SettingsScaffold
 import org.uwuaosp.updater.controller.UpdaterController
 import org.uwuaosp.updater.data.Update
 import org.uwuaosp.updater.data.UpdateStatus
