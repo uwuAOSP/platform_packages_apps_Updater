@@ -90,9 +90,18 @@ room {
 }
 
 dependencies {
-    compileOnly(fileTree(mapOf("dir" to "../system_libs", "include" to listOf("*.jar"))))
+    compileOnly(
+        fileTree(
+            mapOf(
+                "dir" to "../system_libs",
+                "include" to listOf("*.jar"),
+                "exclude" to listOf("uwuComposeSettingsLib.jar"),
+            )
+        )
+    )
 
-    debugImplementation(files("../system_libs/SettingsLib.jar", "../system_libs/SpaLib.jar", "../system_libs/uwuComposeSettingsLib.jar"))
+    implementation(project(":uwu-compose"))
+    debugImplementation(files("../system_libs/SettingsLib.jar", "../system_libs/SpaLib.jar"))
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.lottie.compose)
 
