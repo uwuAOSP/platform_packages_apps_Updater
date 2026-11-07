@@ -2,6 +2,8 @@
  * SPDX-FileCopyrightText: 2026 The uwuAOSP Project
  * SPDX-License-Identifier: Apache-2.0
  */
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.uwuaosp.updater.ui
 
 import android.content.Intent
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
@@ -45,34 +48,58 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
     var document by remember(version) { mutableStateOf<ChangelogDocument?>(null) }
     var loading by remember(version) { mutableStateOf(true) }
     LaunchedEffect(version) {
-        try { document = repository.load(version) }
-        catch (e: CancellationException) { throw e }
-        catch (_: Exception) { document = null }
-        finally { loading = false }
+        try {
+            document = repository.load(version)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            document = null
+        } finally {
+            loading = false
+        }
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(R.string.uwu_changelog), style = MaterialTheme.typography.headlineSmall)
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                stringResource(R.string.uwu_changelog),
+                style = MaterialTheme.typography.headlineSmall,
+            )
             Text("uwuAOSP $version", style = MaterialTheme.typography.titleLarge)
             if (loading) {
                 LoadingIndicator(Modifier.padding(bottom = 24.dp))
             } else if (document == null) {
-                Text(stringResource(R.string.uwu_changelog_missing), Modifier.padding(bottom = 32.dp))
+                Text(
+                    stringResource(R.string.uwu_changelog_missing),
+                    Modifier.padding(bottom = 32.dp),
+                )
             } else {
                 val content = document!!
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(content.blocks) { block ->
-                        Text(block.text, style = when (block.heading) {
-                            2 -> MaterialTheme.typography.titleLarge
-                            in 3..6 -> MaterialTheme.typography.titleMedium
-                            else -> MaterialTheme.typography.bodyMedium
-                        }, fontFamily = if (block.code) FontFamily.Monospace else null)
+                        Text(
+                            block.text,
+                            style =
+                                when (block.heading) {
+                                    2 -> MaterialTheme.typography.titleLarge
+                                    in 3..6 -> MaterialTheme.typography.titleMedium
+                                    else -> MaterialTheme.typography.bodyMedium
+                                },
+                            fontFamily = if (block.code) FontFamily.Monospace else null,
+                        )
                     }
                     item {
-                        TextButton(onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, content.url.toUri())
-                            if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
-                        }, modifier = Modifier.padding(bottom = 24.dp)) {
+                        TextButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, content.url.toUri())
+                                if (intent.resolveActivity(context.packageManager) != null)
+                                    context.startActivity(intent)
+                            },
+                            modifier = Modifier.padding(bottom = 24.dp),
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
                             Text(stringResource(R.string.uwu_view_source))
                         }
                     }

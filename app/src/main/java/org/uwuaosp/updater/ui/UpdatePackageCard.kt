@@ -3,6 +3,8 @@
  * SPDX-FileCopyrightText: 2026 The uwuAOSP Project
  * SPDX-License-Identifier: Apache-2.0
  */
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.uwuaosp.updater.ui
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -12,18 +14,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,6 +47,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import org.uwuaosp.compose.widget.menu.SettingsDropdownMenu
+import org.uwuaosp.compose.widget.menu.SettingsMenuGroup
+import org.uwuaosp.compose.widget.menu.SettingsMenuItem
 import org.uwuaosp.updater.R
 import org.uwuaosp.updater.updates.action.UpdateAction
 import org.uwuaosp.updater.updates.action.UpdateActionType
@@ -58,26 +63,50 @@ fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) 
     var menu by remember { mutableStateOf(false) }
     val titleStyle = MaterialTheme.typography.titleMedium.copy(letterSpacing = 0.sp)
     val bodyStyle = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.sp)
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
-        shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright),
+        shape = MaterialTheme.shapes.extraLarge,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("uwuAOSP ${state.buildVersion}", style = titleStyle)
-                    Text("${state.fileSize} - ${state.buildDate}", style = bodyStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "${state.fileSize} - ${state.buildDate}",
+                        style = bodyStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (state.status.isNotEmpty()) Text(state.status, style = bodyStyle)
                 }
                 if (state.actions.overflow.isNotEmpty()) {
                     androidx.compose.foundation.layout.Box {
-                        IconButton(onClick = { menu = true }) {
-                            Icon(painterResource(R.drawable.ic_uwu_more), stringResource(R.string.uwu_more_options))
+                        IconButton(
+                            onClick = { menu = true },
+                            shapes = IconButtonDefaults.shapes(),
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_uwu_more),
+                                stringResource(R.string.uwu_more_options),
+                            )
                         }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            state.actions.overflow.forEach { action ->
-                                DropdownMenuItem(text = { Text(action.type.title(context)) }, enabled = action.enabled,
-                                    onClick = { menu = false; onAction(action) },
-                                    leadingIcon = { Icon(painterResource(action.type.icon()), null) })
+                        SettingsDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            SettingsMenuGroup {
+                                state.actions.overflow.forEachIndexed { index, action ->
+                                    SettingsMenuItem(
+                                        text = action.type.title(context),
+                                        index = index,
+                                        itemCount = state.actions.overflow.size,
+                                        enabled = action.enabled,
+                                        onClick = {
+                                            menu = false
+                                            onAction(action)
+                                        },
+                                        leadingIcon = {
+                                            Icon(painterResource(action.type.icon()), null)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -86,15 +115,29 @@ fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) 
             state.progress?.let { progress -> PackageProgress(progress, state) }
             if (state.progress == null) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (state.securityUpdate.isNotBlank()) Text(state.securityUpdate, style = bodyStyle)
-                    Text(if (state.installNote == R.string.list_major_upgrade_recovery_install)
-                        stringResource(state.installNote, stringResource(R.string.brand_name))
-                        else stringResource(state.installNote), style = bodyStyle)
+                    if (state.securityUpdate.isNotBlank())
+                        Text(state.securityUpdate, style = bodyStyle)
+                    Text(
+                        if (state.installNote == R.string.list_major_upgrade_recovery_install)
+                            stringResource(state.installNote, stringResource(R.string.brand_name))
+                        else stringResource(state.installNote),
+                        style = bodyStyle,
+                    )
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 state.actions.secondary?.let { action ->
-                    TextButton(onClick = { onAction(action) }, enabled = action.enabled) { Text(action.type.title(context)) }
+                    TextButton(
+                        onClick = { onAction(action) },
+                        enabled = action.enabled,
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text(action.type.title(context))
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 val primary = state.actions.primary
@@ -103,10 +146,23 @@ fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) 
                     Spacer(Modifier.size(8.dp))
                     Text(primary.type.title(context))
                 }
-                if (primary.type == UpdateActionType.PAUSE_DOWNLOAD || primary.type == UpdateActionType.PAUSE_INSTALL) {
-                    FilledTonalButton(onClick = { onAction(primary) }, enabled = primary.enabled, content = content)
+                if (
+                    primary.type == UpdateActionType.PAUSE_DOWNLOAD ||
+                        primary.type == UpdateActionType.PAUSE_INSTALL
+                ) {
+                    FilledTonalButton(
+                        onClick = { onAction(primary) },
+                        enabled = primary.enabled,
+                        content = content,
+                        shapes = ButtonDefaults.shapes(),
+                    )
                 } else {
-                    Button(onClick = { onAction(primary) }, enabled = primary.enabled, content = content)
+                    Button(
+                        onClick = { onAction(primary) },
+                        enabled = primary.enabled,
+                        content = content,
+                        shapes = ButtonDefaults.shapes(),
+                    )
                 }
             }
         }
@@ -117,36 +173,78 @@ fun UpdatePackageCard(state: UpdateItemState, onAction: (UpdateAction) -> Unit) 
 @Composable
 private fun PackageProgress(progress: ProgressState, state: UpdateItemState) {
     var foreground by remember { mutableStateOf(false) }
-    LifecycleResumeEffect(Unit) { foreground = true; onPauseOrDispose { foreground = false } }
-    val active = state.actions.primary.type in setOf(UpdateActionType.PAUSE_DOWNLOAD,
-        UpdateActionType.PAUSE_INSTALL, UpdateActionType.CANCEL_INSTALL) || progress is ProgressState.Indeterminate
+    LifecycleResumeEffect(Unit) {
+        foreground = true
+        onPauseOrDispose { foreground = false }
+    }
+    val active =
+        state.actions.primary.type in
+            setOf(
+                UpdateActionType.PAUSE_DOWNLOAD,
+                UpdateActionType.PAUSE_INSTALL,
+                UpdateActionType.CANCEL_INSTALL,
+            ) || progress is ProgressState.Indeterminate
     val stroke = with(LocalDensity.current) { Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round) }
     val speed = if (foreground && active) 40.dp else 0.dp
     when (progress) {
         is ProgressState.Determinate -> {
-            val value = animateFloatAsState((progress.percent / 100).coerceIn(0f, 1f), spring(dampingRatio = 1f, stiffness = 400f), label = "OTA progress")
-            LinearWavyProgressIndicator(progress = { value.value }, modifier = Modifier.fillMaxWidth().height(16.dp),
-                stroke = stroke, trackStroke = stroke,
+            val value =
+                animateFloatAsState(
+                    (progress.percent / 100).coerceIn(0f, 1f),
+                    spring(dampingRatio = 1f, stiffness = 400f),
+                    label = "OTA progress",
+                )
+            LinearWavyProgressIndicator(
+                progress = { value.value },
+                modifier = Modifier.fillMaxWidth().height(16.dp),
+                stroke = stroke,
+                trackStroke = stroke,
                 amplitude = { WavyProgressIndicatorDefaults.indicatorAmplitude(it) * 0.35f },
-                wavelength = 28.dp, waveSpeed = speed, gapSize = 4.dp, stopSize = 4.dp)
-            Text("${progress.percent.toInt()}%", Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            if (progress.downloadedSize.isNotEmpty()) Text(listOf(progress.downloadedSize, progress.eta)
-                .filter { it.isNotEmpty() }.joinToString(" - "), style = MaterialTheme.typography.bodySmall)
+                wavelength = 28.dp,
+                waveSpeed = speed,
+                gapSize = 4.dp,
+                stopSize = 4.dp,
+            )
+            Text(
+                "${progress.percent.toInt()}%",
+                Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            if (progress.downloadedSize.isNotEmpty())
+                Text(
+                    listOf(progress.downloadedSize, progress.eta)
+                        .filter { it.isNotEmpty() }
+                        .joinToString(" - "),
+                    style = MaterialTheme.typography.bodySmall,
+                )
         }
-        ProgressState.Indeterminate -> LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().height(16.dp),
-            stroke = stroke, trackStroke = stroke, amplitude = 0.35f,
-            wavelength = 28.dp, waveSpeed = speed, gapSize = 4.dp)
+        ProgressState.Indeterminate ->
+            LinearWavyProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(16.dp),
+                stroke = stroke,
+                trackStroke = stroke,
+                amplitude = 0.35f,
+                wavelength = 28.dp,
+                waveSpeed = speed,
+                gapSize = 4.dp,
+            )
     }
 }
 
-private fun UpdateActionType.icon(): Int = when (this) {
-    UpdateActionType.PAUSE_DOWNLOAD, UpdateActionType.PAUSE_INSTALL -> R.drawable.ic_uwu_pause
-    UpdateActionType.RESUME_DOWNLOAD, UpdateActionType.RESUME_INSTALL -> R.drawable.ic_uwu_play
-    UpdateActionType.REBOOT -> R.drawable.ic_uwu_restart
-    UpdateActionType.DELETE, UpdateActionType.CANCEL_DOWNLOAD, UpdateActionType.CANCEL_INSTALL -> R.drawable.ic_uwu_delete
-    UpdateActionType.EXPORT -> R.drawable.ic_uwu_download
-    UpdateActionType.START_INSTALL -> R.drawable.ic_uwu_check
-    UpdateActionType.SHOW_INFO, UpdateActionType.OPEN_GUIDE -> R.drawable.ic_uwu_article
-    else -> R.drawable.ic_uwu_cloud
-}
+private fun UpdateActionType.icon(): Int =
+    when (this) {
+        UpdateActionType.PAUSE_DOWNLOAD,
+        UpdateActionType.PAUSE_INSTALL -> R.drawable.ic_uwu_pause
+        UpdateActionType.RESUME_DOWNLOAD,
+        UpdateActionType.RESUME_INSTALL -> R.drawable.ic_uwu_play
+        UpdateActionType.REBOOT -> R.drawable.ic_uwu_restart
+        UpdateActionType.DELETE,
+        UpdateActionType.CANCEL_DOWNLOAD,
+        UpdateActionType.CANCEL_INSTALL -> R.drawable.ic_uwu_delete
+        UpdateActionType.EXPORT -> R.drawable.ic_uwu_download
+        UpdateActionType.START_INSTALL -> R.drawable.ic_uwu_check
+        UpdateActionType.SHOW_INFO,
+        UpdateActionType.OPEN_GUIDE -> R.drawable.ic_uwu_article
+        else -> R.drawable.ic_uwu_cloud
+    }

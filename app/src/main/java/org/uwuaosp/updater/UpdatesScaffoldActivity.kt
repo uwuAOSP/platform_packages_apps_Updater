@@ -3,6 +3,8 @@
  * SPDX-FileCopyrightText: 2026 The uwuAOSP Project
  * SPDX-License-Identifier: Apache-2.0
  */
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.uwuaosp.updater
 
 import android.content.Intent
@@ -18,19 +20,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,9 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -56,14 +55,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import org.uwuaosp.compose.framework.theme.SettingsTheme
+import org.uwuaosp.compose.widget.menu.SettingsDropdownMenu
+import org.uwuaosp.compose.widget.menu.SettingsMenuGroup
+import org.uwuaosp.compose.widget.menu.SettingsMenuItem
 import org.uwuaosp.compose.widget.preference.PreferenceRow
 import org.uwuaosp.compose.widget.preference.SettingsPreferenceGroup
 import org.uwuaosp.compose.widget.scaffold.SettingsScaffold
+import org.uwuaosp.compose.widget.scaffold.SettingsToolbarActionButton
 import org.uwuaosp.updater.controller.UpdaterController
 import org.uwuaosp.updater.data.Update
 import org.uwuaosp.updater.data.UpdateStatus
@@ -97,15 +100,27 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
                 LaunchedEffect(viewModel, owner) {
                     owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                         viewModel.feedback.collect { message ->
-                            Toast.makeText(this@UpdatesScaffoldActivity, message, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                    this@UpdatesScaffoldActivity,
+                                    message,
+                                    Toast.LENGTH_SHORT,
+                                )
+                                .show()
                         }
                     }
                 }
-                UpdatesContent(uiState, activeController, controllerRevision,
-                    onBack = { finish() }, onRefresh = { onRefreshClick() },
+                UpdatesContent(
+                    uiState,
+                    activeController,
+                    controllerRevision,
+                    onBack = { finish() },
+                    onRefresh = { onRefreshClick() },
                     onImport = { onLocalUpdateClick() },
-                    onPreferences = { startActivity(Intent(this, PreferencesActivity::class.java)) },
-                    activity = this)
+                    onPreferences = {
+                        startActivity(Intent(this, PreferencesActivity::class.java))
+                    },
+                    activity = this,
+                )
                 ImportDialogs()
             }
         }
@@ -116,9 +131,18 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
         notifyControllerStateChanged()
     }
 
-    protected fun notifyControllerStateChanged() { controllerRevision++ }
-    protected fun showImportProgress() { importing = true }
-    protected fun hideImportProgress() { importing = false }
+    protected fun notifyControllerStateChanged() {
+        controllerRevision++
+    }
+
+    protected fun showImportProgress() {
+        importing = true
+    }
+
+    protected fun hideImportProgress() {
+        importing = false
+    }
+
     protected fun showImportResult(message: String) {
         importing = false
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
@@ -148,65 +172,120 @@ abstract class UpdatesScaffoldActivity : ComponentActivity() {
     }
 
     open fun onRefreshClick() {}
+
     open fun onLocalUpdateClick() {}
+
     open fun exportUpdate(update: Update) {}
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdatesContent(
-    state: UpdatesViewModel.UiState, controller: UpdaterController?, revision: Int,
-    onBack: () -> Unit, onRefresh: () -> Unit, onImport: () -> Unit,
-    onPreferences: () -> Unit, activity: UpdatesScaffoldActivity,
+    state: UpdatesViewModel.UiState,
+    controller: UpdaterController?,
+    revision: Int,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onImport: () -> Unit,
+    onPreferences: () -> Unit,
+    activity: UpdatesScaffoldActivity,
 ) {
     val application = activity.application as UpdaterApplication
-    val network by application.networkMonitor.networkState.collectAsStateWithLifecycle(
-        application.networkMonitor.currentNetworkState)
-    val streaming by application.userPreferencesRepository.streamUpdatesFlow.collectAsStateWithLifecycle(true)
+    val network by
+        application.networkMonitor.networkState.collectAsStateWithLifecycle(
+            application.networkMonitor.currentNetworkState
+        )
+    val streaming by
+        application.userPreferencesRepository.streamUpdatesFlow.collectAsStateWithLifecycle(true)
     var menu by remember { mutableStateOf(false) }
     var changelog by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<AlertDialogState?>(null) }
-    val items = remember(state.updates, controller, revision, streaming, network) {
-        controller?.let {
-            val mapper = UpdateItemStateMapper(activity, it, streaming)
-            state.updates.mapNotNull { update -> it.getUpdate(update.downloadId)?.let { actual -> mapper.map(actual, network) } }
-        }.orEmpty()
-    }
-    val actions = remember(controller) {
-        controller?.let { UpdateActionHandler(activity, it, { update -> activity.exportUpdate(update) }, { dialog = it }) }
-    }
-    val newVersion = state.updates.any { it.timestamp > DeviceInfoUtils.buildDateTimestamp }
-    val hasPausedOrFailedUpdate = (controller?.updates ?: state.updates).any { update ->
-        when (update.status) {
-            UpdateStatus.PAUSED,
-            UpdateStatus.PAUSED_ERROR,
-            UpdateStatus.VERIFICATION_FAILED,
-            UpdateStatus.INSTALLATION_FAILED,
-            UpdateStatus.INSTALLATION_SUSPENDED -> true
-            else -> false
+    val items =
+        remember(state.updates, controller, revision, streaming, network) {
+            controller
+                ?.let {
+                    val mapper = UpdateItemStateMapper(activity, it, streaming)
+                    state.updates.mapNotNull { update ->
+                        it.getUpdate(update.downloadId)?.let { actual ->
+                            mapper.map(actual, network)
+                        }
+                    }
+                }
+                .orEmpty()
         }
-    }
-    val showUpdateAnimation = newVersion || controller?.isBusy == true ||
-        hasPausedOrFailedUpdate || state.hasUpdateCheckFailed
+    val actions =
+        remember(controller) {
+            controller?.let {
+                UpdateActionHandler(
+                    activity,
+                    it,
+                    { update -> activity.exportUpdate(update) },
+                    { dialog = it },
+                )
+            }
+        }
+    val newVersion = state.updates.any { it.timestamp > DeviceInfoUtils.buildDateTimestamp }
+    val hasPausedOrFailedUpdate =
+        (controller?.updates ?: state.updates).any { update ->
+            when (update.status) {
+                UpdateStatus.PAUSED,
+                UpdateStatus.PAUSED_ERROR,
+                UpdateStatus.VERIFICATION_FAILED,
+                UpdateStatus.INSTALLATION_FAILED,
+                UpdateStatus.INSTALLATION_SUSPENDED -> true
+                else -> false
+            }
+        }
+    val showUpdateAnimation =
+        newVersion ||
+            controller?.isBusy == true ||
+            hasPausedOrFailedUpdate ||
+            state.hasUpdateCheckFailed
     if (changelog) ChangelogSheet { changelog = false }
     dialog?.let { value -> UpdateActionDialog(value) { dialog = null } }
 
-    SettingsScaffold(title = stringResource(R.string.display_name),
-        showBackButton = true, onNavigateUp = onBack, startCollapsed = false,
+    SettingsScaffold(
+        title = stringResource(R.string.display_name),
+        showBackButton = true,
+        onNavigateUp = onBack,
+        startCollapsed = false,
         actions = {
             Box {
-                IconButton(onClick = { menu = true }) { Icon(painterResource(R.drawable.ic_uwu_more), stringResource(R.string.uwu_more_options)) }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_preferences)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_uwu_settings), null) },
-                        onClick = { menu = false; onPreferences() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.local_update_import)) },
-                        enabled = controller != null && !controller.isBusy,
-                        leadingIcon = { Icon(painterResource(R.drawable.ic_uwu_upload), null) },
-                        onClick = { menu = false; onImport() })
+                SettingsToolbarActionButton(
+                    imageVector = ImageVector.vectorResource(R.drawable.ic_uwu_more),
+                    contentDescription = stringResource(R.string.uwu_more_options),
+                    onClick = { menu = true },
+                )
+                SettingsDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    SettingsMenuGroup {
+                        SettingsMenuItem(
+                            text = stringResource(R.string.menu_preferences),
+                            index = 0,
+                            itemCount = 2,
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.ic_uwu_settings), null)
+                            },
+                            onClick = {
+                                menu = false
+                                onPreferences()
+                            },
+                        )
+                        SettingsMenuItem(
+                            text = stringResource(R.string.local_update_import),
+                            index = 1,
+                            itemCount = 2,
+                            enabled = controller != null && !controller.isBusy,
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_uwu_upload), null) },
+                            onClick = {
+                                menu = false
+                                onImport()
+                            },
+                        )
+                    }
                 }
             }
-        }) {
+        },
+    ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val header: @Composable () -> Unit = {
                 UwuHero(showUpdateAnimation = showUpdateAnimation)
@@ -214,13 +293,25 @@ private fun UpdatesContent(
                 if (maintainer.isNotEmpty()) {
                     val description = "${stringResource(R.string.uwu_maintainer)}: $maintainer"
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Surface(shape = CircleShape,
+                        Surface(
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description }) {
-                            Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(painterResource(R.drawable.ic_uwu_person), null, Modifier.size(16.dp))
+                            modifier =
+                                Modifier.semantics(mergeDescendants = true) {
+                                    contentDescription = description
+                                },
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_uwu_person),
+                                    null,
+                                    Modifier.size(16.dp),
+                                )
                                 Text(maintainer, style = MaterialTheme.typography.labelMedium)
                             }
                         }
@@ -232,9 +323,12 @@ private fun UpdatesContent(
                 SystemInformation()
                 SettingsPreferenceGroup {
                     item {
-                        PreferenceRow(title = stringResource(R.string.uwu_changelog),
+                        PreferenceRow(
+                            title = stringResource(R.string.uwu_changelog),
                             summary = "uwuAOSP ${DeviceInfoUtils.buildVersion}",
-                            icon = ImageVector.vectorResource(R.drawable.ic_uwu_article), onClick = { changelog = true })
+                            icon = ImageVector.vectorResource(R.drawable.ic_uwu_article),
+                            onClick = { changelog = true },
+                        )
                     }
                 }
             }
